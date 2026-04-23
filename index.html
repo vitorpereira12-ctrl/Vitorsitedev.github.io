@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ubuntu Terminal Simulator - Vitor@Space Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Ubuntu+Mono:wght@400;700&display=swap');
+
+        :root {
+            --neon-cyan: #00f2ff;
+            --neon-orange: #ff4d00;
+            --neon-green: #39ff14;
+            --deep-bg: #050505;
+            --panel-bg: rgba(10, 15, 25, 0.75);
+        }
+
+        body, html {
+            height: 100vh;
+            margin: 0;
+            background-color: var(--deep-bg);
+            background-image: 
+                linear-gradient(rgba(0, 242, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 242, 255, 0.05) 1px, transparent 1px),
+                radial-gradient(circle at 50% 50%, #0a192f 0%, #02060c 100%);
+            background-size: 40px 40px, 40px 40px, 100% 100%;
+            font-family: 'Ubuntu Mono', monospace;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        #main-container {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            padding: 25px;
+            height: calc(100vh - 40px);
+            overflow: hidden;
+        }
+
+        #sidebar, #log-panel {
+            width: 320px;
+            background: var(--panel-bg);
+            border-radius: 16px;
+            border: 1px solid rgba(0, 242, 255, 0.3);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 25px rgba(0, 242, 255, 0.1);
+            backdrop-filter: blur(20px);
+            overflow: hidden;
+        }
+
+        .scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--neon-cyan) transparent;
+        }
+
+        .scroll-area::-webkit-scrollbar, #terminal-body::-webkit-scrollbar { width: 6px; }
+        .scroll-area::-webkit-scrollbar-thumb, #terminal-body::-webkit-scrollbar-thumb {
+            background: var(--neon-cyan);
+            border-radius: 10px;
+        }
+
+        .log-header, .sidebar-header {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 14px;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 242, 255, 0.3);
+            color: var(--neon-cyan);
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 1px;
+        }
+
+        .category-title {
+            color: var(--neon-cyan);
+            font-weight: bold;
+            margin: 15px 0 10px 0;
+            padding-bottom: 5px;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 2px;
+            border-bottom: 1px solid rgba(0, 242, 255, 0.1);
+        }
+
+        .command-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.03);
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .command-item:hover { 
+            background: rgba(0, 242, 255, 0.15); 
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.2);
+            transform: translateX(5px);
+        }
+
+        .cmd-name { color: var(--neon-green); font-weight: bold; }
+
+        #terminal-window {
+            flex: 2;
+            background: rgba(2, 6, 12, 0.92);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--neon-cyan);
+            box-shadow: 0 0 30px rgba(0, 242, 255, 0.2);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+
+        #terminal-header {
+            background: rgba(0, 0, 0, 0.8);
+            height: 40px;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            border-bottom: 1px solid rgba(0, 242, 255, 0.3);
+        }
+
+        .window-dot { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+
+        #terminal-body {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+            color: #fff;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .prompt-user { color: var(--neon-cyan); font-weight: bold; }
+        .prompt-path { color: var(--neon-orange); font-weight: bold; }
+        
+        .input-line { display: flex; align-items: flex-start; margin-top: 10px; }
+        #command-input {
+            background: transparent; border: none; color: white;
+            font-family: 'Ubuntu Mono', monospace; font-size: 15px;
+            flex: 1; outline: none; margin-left: 10px;
+            caret-color: var(--neon-cyan);
+        }
+
+        .output { margin-bottom: 15px; white-space: pre-wrap; color: #cbd5e1; font-size: 14px; }
+        .log-entry { border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding: 8px 0; font-size: 11px; }
+        .log-time { color: var(--neon-orange); font-weight: bold; }
+
+        footer {
+            height: 40px;
+            background: rgba(0, 0, 0, 0.9);
+            color: rgba(255,255,255,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            border-top: 1px solid rgba(0, 242, 255, 0.2);
+        }
+
+        .active-neon { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="main-container">
+        <!-- Sidebar -->
+        <div id="sidebar">
+            <div class="sidebar-header">
+                <span class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-cyan-400 rounded-full active-neon"></span> 
+                    FUNCIONALIDADES
+                </span>
+            </div>
+            
+            <div class="scroll-area">
+                <div class="sidebar-category">
+                    <div class="category-title">📁 Manipulação de Ficheiros</div>
+                    <div class="command-item" onclick="insertCmd('ls -la')"><span class="cmd-name">ls</span><span class="text-[10px] opacity-50">Listar</span></div>
+                    <div class="command-item" onclick="insertCmd('cd /home/vitor')"><span class="cmd-name">cd</span><span class="text-[10px] opacity-50">Navegar</span></div>
+                    <div class="command-item" onclick="insertCmd('mkdir lab_si')"><span class="cmd-name">mkdir</span><span class="text-[10px] opacity-50">Diretório</span></div>
+                    <div class="command-item" onclick="insertCmd('touch readme.txt')"><span class="cmd-name">touch</span><span class="text-[10px] opacity-50">Criar</span></div>
+                    <div class="command-item" onclick="insertCmd('cat readme.txt')"><span class="cmd-name">cat</span><span class="text-[10px] opacity-50">Exibir</span></div>
+                    <div class="command-item" onclick="insertCmd('rm readme.txt')"><span class="cmd-name">rm</span><span class="text-[10px] opacity-50">Eliminar</span></div>
+                    <div class="command-item" onclick="insertCmd('cp arq1.txt arq2.txt')"><span class="cmd-name">cp</span><span class="text-[10px] opacity-50">Copiar</span></div>
+                </div>
+
+                <div class="sidebar-category mt-4">
+                    <div class="category-title">⚙️ Gestão do Sistema</div>
+                    <div class="command-item" onclick="insertCmd('top')"><span class="cmd-name">top</span><span class="text-[10px] opacity-50">Status</span></div>
+                    <div class="command-item" onclick="insertCmd('ps -aux')"><span class="cmd-name">ps</span><span class="text-[10px] opacity-50">Processos</span></div>
+                    <div class="command-item" onclick="insertCmd('df -h')"><span class="cmd-name">df</span><span class="text-[10px] opacity-50">Disco</span></div>
+                    <div class="command-item" onclick="insertCmd('uname -a')"><span class="cmd-name">uname</span><span class="text-[10px] opacity-50">Kernel</span></div>
+                    <div class="command-item" onclick="insertCmd('uptime')"><span class="cmd-name">uptime</span><span class="text-[10px] opacity-50">Tempo</span></div>
+                    <div class="command-item" onclick="insertCmd('history')"><span class="cmd-name">history</span><span class="text-[10px] opacity-50">Histórico</span></div>
+                </div>
+
+                <div class="sidebar-category mt-4">
+                    <div class="category-title">🌐 Conectividade & Redes</div>
+                    <div class="command-item" onclick="insertCmd('ip addr')"><span class="cmd-name">ip</span><span class="text-[10px] opacity-50">Interfaces</span></div>
+                    <div class="command-item" onclick="insertCmd('ping google.com')"><span class="cmd-name">ping</span><span class="text-[10px] opacity-50">ICMP</span></div>
+                    <div class="command-item" onclick="insertCmd('curl ifconfig.me')"><span class="cmd-name">curl</span><span class="text-[10px] opacity-50">Web Get</span></div>
+                    <div class="command-item" onclick="insertCmd('netstat -l')"><span class="cmd-name">netstat</span><span class="text-[10px] opacity-50">Portas</span></div>
+                </div>
+
+                <div class="sidebar-category mt-4">
+                    <div class="category-title">🛠️ Utilitários</div>
+                    <div class="command-item" onclick="insertCmd('sudo apt update')"><span class="cmd-name">apt</span><span class="text-[10px] opacity-50">Pacotes</span></div>
+                    <div class="command-item" onclick="insertCmd('echo \'Olá Mundo\'')"><span class="cmd-name">echo</span><span class="text-[10px] opacity-50">Print</span></div>
+                    <div class="command-item" onclick="insertCmd('nano script.sh')"><span class="cmd-name">nano</span><span class="text-[10px] opacity-50">Editor</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terminal -->
+        <div id="terminal-window">
+            <div id="terminal-header">
+                <div class="window-dot bg-red-500"></div>
+                <div class="window-dot bg-yellow-500"></div>
+                <div class="window-dot bg-green-500"></div>
+                <div class="flex-1 text-center text-[10px] text-cyan-400 font-bold tracking-[4px] uppercase">Terminal de Vitor@Space-SI</div>
+            </div>
+            <div id="terminal-body">
+                <div id="output-container">
+                    <div class="output">Authorized User: vitor@space-si
+System: Ubuntu 22.04 LTS (Kernel 5.15.0)
+
+* Identidade vitor@space-si configurada.
+* Comandos de histórico, sistema e utilitários ativos.
+* Use 'help' para ver todos os comandos.</div>
+                </div>
+                <div class="input-line">
+                    <span id="prompt-label"></span>
+                    <input type="text" id="command-input" autofocus autocomplete="off" spellcheck="false">
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Panel -->
+        <div id="log-panel">
+            <div class="log-header">
+                <span>📄 HISTÓRICO DE SESSÃO</span>
+                <button onclick="clearLog()" class="hover:text-red-500 transition-colors text-[9px] font-bold">Zerar</button>
+            </div>
+            <div class="scroll-area" id="log-content">
+                <div class="text-center text-gray-600 mt-10 italic text-[11px]">Aguardando atividades...</div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        DEEP SPACE SIMULATOR | DESENVOLVIDO POR VITOR | SI 2024
+    </footer>
+
+    <script>
+        // Virtual File System State
+        let files = ['projetos', 'docs', 'config.sys', 'vitor_profile'];
+        let commandHistory = [];
+        let historyPointer = -1;
+
+        const outputContainer = document.getElementById('output-container');
+        const commandInput = document.getElementById('command-input');
+        const promptLabel = document.getElementById('prompt-label');
+        const terminalBody = document.getElementById('terminal-body');
+        const logContent = document.getElementById('log-content');
+
+        function updatePrompt() {
+            promptLabel.innerHTML = `<span class="prompt-user">vitor</span>@<span class="prompt-host">space-si</span>:<span class="prompt-path">~</span>$`;
+        }
+
+        function insertCmd(cmdText) {
+            commandInput.value = cmdText;
+            commandInput.focus();
+        }
+
+        function addLogEntry(cmd) {
+            if (logContent.querySelector('div.italic')) logContent.innerHTML = '';
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<div class="log-time">[${timeStr}]</div><div class="log-cmd">> ${cmd}</div>`;
+            logContent.prepend(entry);
+        }
+
+        function clearLog() {
+            logContent.innerHTML = '<div class="text-center text-gray-600 mt-10 italic text-[11px]">Log limpo por Vitor.</div>';
+        }
+
+        // Engine de Comandos Expandida
+        const commands = {
+            'ls': (args) => files.join('  '),
+            'mkdir': (args) => {
+                if (!args[0]) return "mkdir: faltando operando";
+                files.push(args[0] + '/');
+                return `Diretório '${args[0]}' criado com sucesso.`;
+            },
+            'touch': (args) => {
+                if (!args[0]) return "touch: faltando arquivo";
+                if (!files.includes(args[0])) files.push(args[0]);
+                return `Ficheiro '${args[0]}' criado.`;
+            },
+            'rm': (args) => {
+                if (!args[0]) return "rm: faltando operando";
+                const index = files.indexOf(args[0]);
+                const dirIndex = files.indexOf(args[0] + '/');
+                if (index > -1) { files.splice(index, 1); return `Removido '${args[0]}'`; }
+                if (dirIndex > -1) { files.splice(dirIndex, 1); return `Removido diretório '${args[0]}'`; }
+                return "rm: ficheiro ou diretório não encontrado";
+            },
+            'cat': (args) => {
+                if (!args[0]) return "cat: ficheiro não especificado";
+                return `Visualizando ${args[0]}:\n[CONTEÚDO PROTEGIDO] - Simulação de leitura de dados de Vitor.`;
+            },
+            'cd': (args) => `Diretório alterado para ${args[0] || '~'}.`,
+            'cp': (args) => `Copiando ${args[0]} para ${args[1]}... Concluído.`,
+            'top': () => "Vitor-Task-Manager: CPU 0.4%, RAM 18% used. No zombie processes.",
+            'ps': () => "PID  TTY      TIME     CMD\n1    ?        00:00:01 systemd\n42   ?        00:00:00 bash\n88   ?        00:00:00 ps -aux",
+            'df': () => "Filesystem     Size  Used  Avail Use% Mounted on\n/dev/sda1      100G   24G    76G  24% /",
+            'uname': (args) => args[0] === '-a' ? "Linux space-si 5.15.0-generic #1-Ubuntu SMP vitor_x86_64 GNU/Linux" : "Linux",
+            'uptime': () => "08:15:02 up 45 min, 1 user, load average: 0.00, 0.01, 0.05",
+            'whoami': () => "vitor",
+            'ip': () => "inet 172.20.10.2/24 brd 172.20.10.255 scope global dynamic eth0",
+            'ping': (args) => `PING ${args[0] || '127.0.0.1'} (ICMP)... 64 bytes: time=1.2ms (vitor-priority)`,
+            'curl': (args) => `[REQUEST] Fetching from ${args[0] || 'space-api.net'}... Status: 200 OK`,
+            'netstat': () => "Active Internet connections\nTCP 0.0.0.0:80  LISTEN\nTCP 0.0.0.0:443 LISTEN",
+            'echo': (args) => args.join(' '),
+            'history': () => commandHistory.map((c, i) => `  ${i+1}  ${c}`).join('\n'),
+            'sudo': (args) => `[sudo] password for vitor: \nExecutando '${args.join(' ')}' com privilégios de ROOT.`,
+            'apt': (args) => `Lendo listas de pacotes... Pronto\nSimulando instalação de ${args[1] || 'updates'}... 100%`,
+            'nano': (args) => `Abrindo editor de texto nano para: ${args[0] || 'new_file'}... (Pressione Ctrl+X para sair na vida real)`,
+            'clear': () => { outputContainer.innerHTML = ''; return null; },
+            'date': () => new Date().toLocaleString(),
+            'exit': () => "Encerrando sessão de Vitor... Logout efetuado.",
+            'help': () => "COMANDOS DISPONÍVEIS:\nArquivos: ls, mkdir, touch, rm, cat, cd, cp\nSistema: top, ps, df, uname, uptime, history\nRede: ip, ping, curl, netstat\nUtil: sudo, apt, echo, nano, clear, date, exit"
+        };
+
+        function exec(input) {
+            const line = input.trim();
+            if (!line) return;
+            
+            addLogEntry(line);
+            commandHistory.push(line);
+            historyPointer = commandHistory.length;
+
+            const parts = line.split(/\s+/);
+            const cmd = parts[0];
+            const args = parts.slice(1);
+            const promptCopy = promptLabel.innerHTML;
+            
+            const cmdRow = document.createElement('div');
+            cmdRow.className = 'input-line';
+            cmdRow.innerHTML = `${promptCopy}<span class="ml-2 text-white">${line}</span>`;
+            outputContainer.appendChild(cmdRow);
+
+            let out = commands[cmd] ? commands[cmd](args) : `${cmd}: comando não encontrado. Digite 'help'.`;
+
+            if (out !== null) {
+                const outDiv = document.createElement('div');
+                outDiv.className = 'output ml-4';
+                outDiv.innerHTML = out;
+                outputContainer.appendChild(outDiv);
+            }
+
+            updatePrompt();
+            terminalBody.scrollTop = terminalBody.scrollHeight;
+        }
+
+        commandInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                const val = commandInput.value;
+                commandInput.value = '';
+                exec(val);
+            } else if (e.key === 'ArrowUp') {
+                if (historyPointer > 0) {
+                    historyPointer--;
+                    commandInput.value = commandHistory[historyPointer];
+                }
+            } else if (e.key === 'ArrowDown') {
+                if (historyPointer < commandHistory.length - 1) {
+                    historyPointer++;
+                    commandInput.value = commandHistory[historyPointer];
+                } else {
+                    historyPointer = commandHistory.length;
+                    commandInput.value = '';
+                }
+            }
+        });
+
+        terminalBody.addEventListener('click', () => commandInput.focus());
+        updatePrompt();
+    </script>
+</body>
+</html>
